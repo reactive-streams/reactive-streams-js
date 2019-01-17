@@ -18,27 +18,5 @@ Underwriting parties:
 
 github name    | Real Name, Email Address used for git commits, Company
 ---------------+----------------------------------------------------------------------------
-rkuhn          | Roland Kuhn, rk@rkuhn.info, Typesafe Inc.
-benjchristensen| Ben Christensen, benjchristensen@gmail.com, Netflix Inc.
 viktorklang    | Viktor Klang, viktor.klang@gmail.com, Typesafe Inc.
-smaldini       | Stephane Maldini, stephane.maldini@gmail.com, Pivotal Software Inc.
-savulchik      | Stanislav Savulchik, s.savulchik@gmail.com
-ktoso          | Konrad Malawski, konrad.malawski@project13.pl, Typesafe Inc.
-ouertani       | Slim Ouertani, ouertani@gmail.com
-2m             | Martynas Mickevičius, mmartynas@gmail.com, Typesafe Inc.
-ldaley         | Luke Daley, luke.daley@gradleware.com, Gradleware Inc.
-colinrgodsey   | Colin Godsey, crgodsey@gmail.com, MediaMath Inc.
-davidmoten     | Dave Moten, davidmoten@gmail.com
-briantopping   | Brian Topping, brian.topping@gmail.com, Mauswerks LLC
-rstoyanchev    | Rossen Stoyanchev, rstoyanchev@pivotal.io, Pivotal
-BjornHamels    | Björn Hamels, bjorn@hamels.nl
-JakeWharton    | Jake Wharton, jakewharton@gmail.com
-anthonyvdotbe  | Anthony Vanelverdinghe, anthonyv.be@outlook.com
-seratch        | Kazuhiro Sera, seratch@gmail.com, SmartNews, Inc.
-akarnokd       | David Karnok, akarnokd@gmail.com
-egetman        | Evgeniy Getman, getman.eugene@gmail.com
-patriknw       | Patrik Nordwall, patrik.nordwall@gmail.com, Lightbend Inc
-angelsanz      | Ángel Sanz, angelsanz@users.noreply.github.com
-shenghaiyang   | 盛海洋, shenghaiyang@aliyun.com
-kiiadi         | Kyle Thomson, kylthoms@amazon.com, Amazon.com
-jroper         | James Roper, james@jazzy.id.au, Lightbend Inc.
+olegdokuka     | Oleh Dokuka, shadowgun@i.ua, Netifi Inc.

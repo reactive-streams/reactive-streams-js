@@ -16,6 +16,7 @@ To ensure consistent development of Reactive Streams towards their goal, a group
 * Red Hat Inc., currently represented by Tim Fox (@purplefox) and Norman Maurer (@normanmaurer)
 * Twitter Inc., currently represented by Marius Eriksen (@mariusaeriksen)
 * Typesafe Inc., currently represented by Viktor Klang (@viktorklang) and Roland Kuhn (@rkuhn)
+* Netifi Inc., currently represented by Oleh Dokuka (@olegdokuka)
 
 The role of this group is detailed in the following, additions to this list are made by pull request as defined below, removals require the consent of the entity to be removed or unanimous consent of all other Gatekeepers. Changing a representative of one of the gatekeeper entities can be done by a member of that entity without requiring consent from the other Gatekeepers.
 
