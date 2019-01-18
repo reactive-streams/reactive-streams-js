@@ -2,6 +2,11 @@
 
 The Reactive Streams project welcomes contributions from anybody who wants to participate in moving this initiative forward. All code or documentation that is contributed will have to be covered by a waiver of all copyrights and other rights as detailed by the LICENSE and COPYING files at each repository root, the rationale for this is that the APIs defined by this project shall be freely implementable and usable by everyone.
 
+## Code of Conduct
+
+This project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+By participating you are expected to uphold this code.
+
 ## Copyright Statement
 
 The aforementioned waiver of copyrights and other rights is represented by the addition of a line to the file [CopyrightWaivers.txt](https://github.com/reactive-streams/reactive-streams-jvm/blob/master/CopyrightWaivers.txt). For a pull request to be considered every contributor must have signed the copyright statement in this way; this may be included within that same pull request.
@@ -12,10 +17,10 @@ To ensure consistent development of Reactive Streams towards their goal, a group
 
 * Kaazing Corp., currently represented by Todd Montgomery (@tmontgomery)
 * Netflix Inc., currently represented by Ben Christensen (@benjchristensen)
-* Pivotal Software Inc., currently represented by Jon Brisbin (@jbrisbin) and Stéphane Maldini (@smaldini)
+* Pivotal Software Inc., currently represented by Stéphane Maldini (@smaldini)
 * Red Hat Inc., currently represented by Tim Fox (@purplefox) and Norman Maurer (@normanmaurer)
 * Twitter Inc., currently represented by Marius Eriksen (@mariusaeriksen)
-* Typesafe Inc., currently represented by Viktor Klang (@viktorklang) and Roland Kuhn (@rkuhn)
+* Typesafe Inc., currently represented by Viktor Klang (@viktorklang)
 * Netifi Inc., currently represented by Oleh Dokuka (@olegdokuka)
 
 The role of this group is detailed in the following, additions to this list are made by pull request as defined below, removals require the consent of the entity to be removed or unanimous consent of all other Gatekeepers. Changing a representative of one of the gatekeeper entities can be done by a member of that entity without requiring consent from the other Gatekeepers.

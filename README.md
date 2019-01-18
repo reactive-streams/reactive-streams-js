@@ -8,6 +8,11 @@ The latest release is available on NPM as
 npm i reactive-streams-js
 ```
 
+## Code of Conduct
+
+This project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+By participating you are expected to uphold this code.
+
 ## Goals, Design and Scope ##
 
 Handling streams of data—especially “live” data whose volume is not predetermined—requires special care in an asynchronous system. The most prominent issue is that resource consumption needs to be carefully controlled such that a fast data source does not overwhelm the stream destination. Asynchrony is needed in order to enable the parallel use of computing resources, on collaborating network hosts or multiple CPU cores within a single machine.
