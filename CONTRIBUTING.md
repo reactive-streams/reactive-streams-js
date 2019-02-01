@@ -78,4 +78,4 @@ Example:
 
 ## Performing Official Releases
 
-Creating binary artifacts, uploading them to central repositories and declaring these to be an official release of the Reactive Streams project requires the consent of all gatekeepers. The process is initiated by creating a ticket in the `reactive-streams` repository for this purpose and consent is signaled in the same way as for pull requests. The actual work of updating version numbers and publishing the artifacts will typically involve pull requests targeting the affected repositories.
+Creating binary artifacts, uploading them to central repositories and declaring these to be an official release of the Reactive Streams project requires the consent of all gatekeepers. The process is initiated by creating a ticket in the `reactive-streams-js` repository for this purpose and consent is signaled in the same way as for pull requests. The actual work of updating version numbers and publishing the artifacts will typically involve pull requests targeting the affected repositories.
