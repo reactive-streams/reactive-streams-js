@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "scripts": {
+    "check": "flow check && tsc --noEmit"
+  },
+  "devDependencies": {
+    "lerna": "^3.5.1",
+    "flow-bin": "^0.92.0",
+    "typescript": "^3.3.1"
+  }
+}
