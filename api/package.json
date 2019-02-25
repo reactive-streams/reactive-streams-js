@@ -1,0 +1,38 @@
+{
+  "name": "reactive-streams",
+  "version": "1.0.0",
+  "description": "Types for Reactive Streams Specification for the JS",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "npm run build:tsc && npm run build:flow",
+    "build:tsc": "tsc",
+    "build:flow": "flow check && babel src/flow -d lib/ && flow-copy-source -v src/flow lib",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reactive-streams/reactive-streams-js.git"
+  },
+  "keywords": [
+    "TypeScript",
+    "Reactive",
+    "Streams",
+    "Reactive",
+    "Reactive",
+    "Programming"
+  ],
+  "author": "Oleh Dokuka<oleh@netifi.com>",
+  "license": "CC0-1.0",
+  "bugs": {
+    "url": "https://github.com/reactive-streams/reactive-streams-js/issues"
+  },
+  "homepage": "https://github.com/reactive-streams/reactive-streams-js#readme",
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-plugin-transform-flow-strip-types": "^6.22.0",
+    "flow-bin": "^0.92.0",
+    "flow-copy-source": "^2.0.2",
+    "typescript": "^3.3.1"
+  }
+}

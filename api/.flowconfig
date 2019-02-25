@@ -1,0 +1,13 @@
+[ignore]
+./ib/.*
+
+[include]
+./src/flow
+
+[libs]
+
+[lints]
+
+[options]
+module.system=node
+[strict]

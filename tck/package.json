@@ -1,0 +1,30 @@
+{
+  "name": "reactive-streams-js-tck",
+  "version": "1.0.0",
+  "description": "TCK",
+  "main": "lib/index.js",
+  "types": "libt/index.ts",
+  "scripts": {
+    "build:tsc": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reactive-streams/reactive-streams-js.git"
+  },
+  "keywords": [
+    "TCK"
+  ],
+  "author": "Oleh Dokuka <oleh@netifi.com>",
+  "license": "CC0-1.0",
+  "bugs": {
+    "url": "https://github.com/reactive-streams/reactive-streams-js/issues"
+  },
+  "homepage": "https://github.com/reactive-streams/reactive-streams-js#readme",
+  "dependencies": {
+    "@types/jest": "^23.3.13",
+    "reactive-streams": "file:../api",
+    "jest": "^24.0.0",
+    "typescript": "^3.3.1"
+  }
+}

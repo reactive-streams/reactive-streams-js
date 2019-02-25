@@ -1,0 +1,5 @@
+{
+    "javascript.validate.enable": false,
+    "flowide.pathToFlow": "/Users/olehdokuka/Documents/Workspace/Java/reactive-streams-js/api/node_modules/.bin/flow",
+    "flow.pathToFlow": "/Users/olehdokuka/Documents/Workspace/Java/reactive-streams-js/api/node_modules/.bin/flow"
+}
