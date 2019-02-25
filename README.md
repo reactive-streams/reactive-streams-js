@@ -130,7 +130,7 @@ interface Subscriber<T> {
 
 | ID                        | Rule                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| <a name="2.1">1</a>       | A `Subscriber` MUST signal demand via `Subscription.request(n: number | bigint)` to receive `onNext` signals. |
+| <a name="2.1">1</a>       | A `Subscriber` MUST signal demand via `Subscription.request(n: number)` to receive `onNext` signals. |
 | [:bulb:](#2.1 "2.1 explained") | *The intent of this rule is to establish that it is the responsibility of the Subscriber to decide when and how many elements it is able and willing to receive. To avoid signal reordering caused by reentrant Subscription methods, it is strongly RECOMMENDED for synchronous Subscriber implementations to invoke Subscription methods at the very end of any signal processing. It is RECOMMENDED that Subscribers request the upper limit of what they are able to process, as requesting only one element at a time results in an inherently inefficient "stop-and-wait" protocol.* |
 | <a name="2.2">2</a>       | If a `Subscriber` suspects that its processing of signals will negatively impact its `Publisher`´s responsivity, it is RECOMMENDED that it asynchronously dispatches its signals. |
 | [:bulb:](#2.2 "2.2 explained") | *The intent of this rule is that a Subscriber should [not obstruct](#term_non-obstructing) the progress of the Publisher from an execution point-of-view. In other words, the Subscriber should not starve the Publisher from receiving CPU cycles.* |
@@ -146,9 +146,9 @@ interface Subscriber<T> {
 | [:bulb:](#2.7 "2.7 explained") | *The intent of this rule is to establish that [external synchronization](#term_ext_sync) must be added if a Subscriber will be using a Subscription concurrently by two or more threads. Note, this rule is implemented by default in JavaScript, since it is [single-threaded](#term_single-threaded) within the same context.* |
 | <a name="2.8">8</a>       | A `Subscriber` MUST be prepared to receive one or more `onNext` signals after having called `Subscription.cancel()` if there are still requested elements pending [see [3.12](#3.12)]. `Subscription.cancel()` does not guarantee to perform the underlying cleaning operations immediately. |
 | [:bulb:](#2.8 "2.8 explained") | *The intent of this rule is to highlight that there may be a delay between calling `cancel` and the Publisher observing that cancellation.* |
-| <a name="2.9">9</a>       | A `Subscriber` MUST be prepared to receive an `onComplete` signal with or without a preceding `Subscription.request(n: number | bigint)` call. |
+| <a name="2.9">9</a>       | A `Subscriber` MUST be prepared to receive an `onComplete` signal with or without a preceding `Subscription.request(n: number)` call. |
 | [:bulb:](#2.9 "2.9 explained") | *The intent of this rule is to establish that completion is unrelated to the demand flow—this allows for streams which complete early, and obviates the need to *poll* for completion.* |
-| <a name="2.10">10</a>     | A `Subscriber` MUST be prepared to receive an `onError` signal with or without a preceding `Subscription.request(n: number | bigint)` call. |
+| <a name="2.10">10</a>     | A `Subscriber` MUST be prepared to receive an `onError` signal with or without a preceding `Subscription.request(n: number)` call. |
 | [:bulb:](#2.10 "2.10 explained") | *The intent of this rule is to establish that Publisher failures may be completely unrelated to signalled demand. This means that Subscribers do not need to poll to find out if the Publisher will not be able to fulfill its requests.* |
 | <a name="2.11">11</a>     | A `Subscriber` MUST make sure that all calls on its [signal](#term_signal) methods happen-before the processing of the respective signals. I.e. the Subscriber must take care of properly publishing the signal to its processing logic. |
 | [:bulb:](#2.11 "2.11 explained") | *The intent of this rule is to establish that it is the responsibility of the Subscriber implementation to make sure that asynchronous processing of its signals are thread safe. See [JMM definition of Happens-Before in section 17.4.5](https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html#jls-17.4.5). Note, this rule is implemented by default in JavaScript, since it is [single-threaded](#term_single-threaded) within the same context.* |
@@ -161,7 +161,7 @@ interface Subscriber<T> {
 
 ```typescript
 interface Subscription {
-    request(n: number | bigint): void;
+    request(n: number): void;
     cancel(): void;
 }
 ```
@@ -178,17 +178,17 @@ interface Subscription {
 | [:bulb:](#3.4 "3.4 explained") | *The intent of this rule is to establish that `request` is intended to be a [non-obstructing](#term_non-obstructing) method, and should be as quick to execute as possible on the calling thread, so avoid heavy computations and other things that would stall the caller´s thread of execution.* |
 | <a name="3.5">5</a>       | `Subscription.cancel` MUST respect the responsivity of its caller by returning in a timely manner, MUST be idempotent and MUST be [thread-safe](#term_thread-safe). |
 | [:bulb:](#3.5 "3.5 explained") | *The intent of this rule is to establish that `cancel` is intended to be a [non-obstructing](#term_non-obstructing) method, and should be as quick to execute as possible on the calling thread, so avoid heavy computations and other things that would stall the caller´s thread of execution. Furthermore, it is also important that it is possible to call it multiple times without any adverse effects.* |
-| <a name="3.6">6</a>       | After the `Subscription` is cancelled, additional `Subscription.request(n: number | bigint)` MUST be [NOPs](#term_nop). |
+| <a name="3.6">6</a>       | After the `Subscription` is cancelled, additional `Subscription.request(n: number)` MUST be [NOPs](#term_nop). |
 | [:bulb:](#3.6 "3.6 explained") | *The intent of this rule is to establish a causal relationship between cancellation of a subscription and the subsequent non-operation of requesting more elements.* |
 | <a name="3.7">7</a>       | After the `Subscription` is cancelled, additional `Subscription.cancel()` MUST be [NOPs](#term_nop). |
 | [:bulb:](#3.7 "3.7 explained") | *The intent of this rule is superseded by [3.5](#3.5).* |
-| <a name="3.8">8</a>       | While the `Subscription` is not cancelled, `Subscription.request(n: number | bigint)` MUST register the given number of additional elements to be produced to the respective subscriber. |
+| <a name="3.8">8</a>       | While the `Subscription` is not cancelled, `Subscription.request(n: number)` MUST register the given number of additional elements to be produced to the respective subscriber. |
 | [:bulb:](#3.8 "3.8 explained") | *The intent of this rule is to make sure that `request`-ing is an additive operation, as well as ensuring that a request for elements is delivered to the Publisher.* |
-| <a name="3.9">9</a>       | While the `Subscription` is not cancelled, `Subscription.request(n: number | bigint)` MUST signal `onError` with a `RangeError` if the argument is <= 0. The cause message SHOULD explain that non-positive request signals are illegal. |
+| <a name="3.9">9</a>       | While the `Subscription` is not cancelled, `Subscription.request(n: number)` MUST signal `onError` with a `RangeError` if the argument is <= 0. The cause message SHOULD explain that non-positive request signals are illegal. |
 | [:bulb:](#3.9 "3.9 explained") | *The intent of this rule is to prevent faulty implementations to proceed operation without any exceptions being raised. Requesting a negative or 0 number of elements, since requests are additive, most likely to be the result of an erroneous calculation on the behalf of the Subscriber.* |
-| <a name="3.10">10</a>     | While the `Subscription` is not cancelled, `Subscription.request(n: number | bigint)` MAY synchronously call `onNext` on this (or other) subscriber(s). |
+| <a name="3.10">10</a>     | While the `Subscription` is not cancelled, `Subscription.request(n: number)` MAY synchronously call `onNext` on this (or other) subscriber(s). |
 | [:bulb:](#3.10 "3.10 explained") | *The intent of this rule is to establish that it is allowed to create synchronous Publishers, i.e. Publishers who execute their logic on the calling thread.* |
-| <a name="3.11">11</a>     | While the `Subscription` is not cancelled, `Subscription.request(n: number | bigint)` MAY synchronously call `onComplete` or `onError` on this (or other) subscriber(s). |
+| <a name="3.11">11</a>     | While the `Subscription` is not cancelled, `Subscription.request(n: number)` MAY synchronously call `onComplete` or `onError` on this (or other) subscriber(s). |
 | [:bulb:](#3.11 "3.11 explained") | *The intent of this rule is to establish that it is allowed to create synchronous Publishers, i.e. Publishers who execute their logic on the calling thread.* |
 | <a name="3.12">12</a>     | While the `Subscription` is not cancelled, `Subscription.cancel()` MUST request the `Publisher` to eventually stop signaling its `Subscriber`. The operation is NOT REQUIRED to affect the `Subscription` immediately. |
 | [:bulb:](#3.12 "3.12 explained") | *The intent of this rule is to establish that the desire to cancel a Subscription is eventually respected by the Publisher, acknowledging that it may take some time before the signal is received.* |
@@ -200,8 +200,8 @@ interface Subscription {
 | [:bulb:](#3.15 "3.15 explained") | *The intent of this rule is to disallow implementations to throw exceptions in response to `cancel` being called.* |
 | <a name="3.16">16</a>     | Calling `Subscription.request` MUST [return normally](#term_return_normally). |
 | [:bulb:](#3.16 "3.16 explained") | *The intent of this rule is to disallow implementations to throw exceptions in response to `request` being called.* |
-| <a name="3.17">17</a>     | A `Subscription` MUST support an unbounded number of calls to `request` and MUST support a demand up to 2^63-1 (`9223372036854775807n`). A demand equal or greater than 2^63-1 (`9223372036854775807n`) MAY be considered by the `Publisher` as “effectively unbounded”. |
-| [:bulb:](#3.17 "3.17 explained") | *The intent of this rule is to establish that the Subscriber can request an unbounded number of elements, in any increment above 0 [see [3.9](#3.9)], in any number of invocations of `request`. As it is not feasibly reachable with current or foreseen hardware within a reasonable amount of time (1 element per nanosecond would take 292 years) to fulfill a demand of 2^63-1, it is allowed for a Publisher to stop tracking demand beyond this point. Note, notation `n` means that the number is of type `bigint` because maximum safe integer in JavaScript is 2^53-1* |
+| <a name="3.17">17</a>     | A `Subscription` MUST support an unbounded number of calls to `request` and MUST support a demand up to 2^63-1 (`9223372036854775807`). A demand equal or greater than 2^63-1 (`9223372036854775807`) MAY be considered by the `Publisher` as “effectively unbounded”. |
+| [:bulb:](#3.17 "3.17 explained") | *The intent of this rule is to establish that the Subscriber can request an unbounded number of elements, in any increment above 0 [see [3.9](#3.9)], in any number of invocations of `request`. As it is not feasibly reachable with current or foreseen hardware within a reasonable amount of time (1 element per nanosecond would take 292 years) to fulfill a demand of 2^63-1, it is allowed for a Publisher to stop tracking demand beyond this point. Note, calculations with full precision are limited to 2^53-1 (`Number.MAX_SAFE_INTEGER`) for the `Number` type. Handling values larger than 2^53-1 with full precision requires using an [arbitrary precision arithmetic library](https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic). |
 
 A `Subscription` is shared by exactly one `Publisher` and one `Subscriber` for the purpose of mediating the data exchange between this pair. This is the reason why the `subscribe()` method does not return the created `Subscription`, but instead returns `void`; the `Subscription` is only passed to the `Subscriber` via the `onSubscribe` callback.
 
