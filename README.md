@@ -80,7 +80,7 @@ followed by a possibly unbounded number of `onNext` signals (as requested by `Su
 
 #### NOTES
 
-Because of [single-threaded](#term_single-threaded) nature of JavaScript, rules [1.3](#1.3), [2.7](#2.7), [2.11](#2.11) and part related to [serial](#term_serially) access in [3.5](#3.5) are implemented by default.
+Because of [single-threaded](#term_single-threaded) nature of JavaScript, rules [1.3](#1.3), [2.7](#2.7), [2.11](#2.11) and part related to [thread-safe](#term_thread-safe) access in [3.5](#3.5) are implemented by default.
 
 ### SPECIFICATION
 
@@ -177,7 +177,7 @@ interface Subscription {
 | <a name="3.4">4</a>       | `Subscription.request` SHOULD respect the responsivity of its caller by returning in a timely manner. |
 | [:bulb:](#3.4 "3.4 explained") | *The intent of this rule is to establish that `request` is intended to be a [non-obstructing](#term_non-obstructing) method, and should be as quick to execute as possible on the calling thread, so avoid heavy computations and other things that would stall the caller´s thread of execution.* |
 | <a name="3.5">5</a>       | `Subscription.cancel` MUST respect the responsivity of its caller by returning in a timely manner, MUST be idempotent and MUST be [thread-safe](#term_thread-safe). |
-| [:bulb:](#3.5 "3.5 explained") | *The intent of this rule is to establish that `cancel` is intended to be a [non-obstructing](#term_non-obstructing) method, and should be as quick to execute as possible on the calling thread, so avoid heavy computations and other things that would stall the caller´s thread of execution. Furthermore, it is also important that it is possible to call it multiple times without any adverse effects.* |
+| [:bulb:](#3.5 "3.5 explained") | *The intent of this rule is to establish that `cancel` is intended to be a [non-obstructing](#term_non-obstructing) method, and should be as quick to execute as possible on the calling thread, so avoid heavy computations and other things that would stall the caller´s thread of execution. Furthermore, it is also important that it is possible to call it multiple times without any adverse effects. Note, the [thread-safe](#term_thread-safe) access is guaranteed by default in JavaScript, since it is [single-threaded](#term_single-threaded) within the same context.* |
 | <a name="3.6">6</a>       | After the `Subscription` is cancelled, additional `Subscription.request(n: number)` MUST be [NOPs](#term_nop). |
 | [:bulb:](#3.6 "3.6 explained") | *The intent of this rule is to establish a causal relationship between cancellation of a subscription and the subsequent non-operation of requesting more elements.* |
 | <a name="3.7">7</a>       | After the `Subscription` is cancelled, additional `Subscription.cancel()` MUST be [NOPs](#term_nop). |
