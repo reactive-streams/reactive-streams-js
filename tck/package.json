@@ -1,6 +1,6 @@
 {
   "name": "reactive-streams-js-tck",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "TCK",
   "main": "lib/index.js",
   "types": "libt/index.ts",

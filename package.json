@@ -1,6 +1,6 @@
 {
   "name": "reactive-streams",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Reactive Streams Specification for the JS",
   "directories": {
     "example": "examples"
@@ -14,7 +14,7 @@
   },
   "keywords": [
     "Reactive",
-    "Reactive Streams",
+    "Reactive-Streams",
     "Reactive Programming",
     "Specification"
   ],

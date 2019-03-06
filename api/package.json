@@ -1,6 +1,6 @@
 {
   "name": "reactive-streams",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Types for Reactive Streams Specification for the JS",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -16,11 +16,10 @@
   },
   "keywords": [
     "TypeScript",
+    "Flow",
+    "Reactive-Streams",
     "Reactive",
-    "Streams",
-    "Reactive",
-    "Reactive",
-    "Programming"
+    "Reactive Programming"
   ],
   "author": "Oleh Dokuka<oleh@netifi.com>",
   "license": "CC0-1.0",
