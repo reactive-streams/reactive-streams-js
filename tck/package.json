@@ -1,9 +1,9 @@
 {
-  "name": "reactive-streams-js-tck",
+  "name": "reactive-streams-tck",
   "version": "1.0.2",
   "description": "TCK",
   "main": "lib/index.js",
-  "types": "libt/index.ts",
+  "types": "lib/index.ts",
   "scripts": {
     "build:tsc": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
