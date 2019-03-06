@@ -5,7 +5,7 @@ The purpose of Reactive Streams is to provide a standard for asynchronous stream
 The latest release is available on NPM as
 
 ```cli
-npm i reactive-streams-js
+npm i reactive-streams
 ```
 
 ## Code of Conduct
@@ -117,7 +117,7 @@ interface Publisher<T> {
 | <a name="1.11">11</a>     | A `Publisher` MAY support multiple `Subscriber`s and decides whether each `Subscription` is unicast or multicast. |
 | [:bulb:](#1.11 "1.11 explained") | *The intent of this rule is to give Publisher implementations the flexibility to decide how many, if any, Subscribers they will support, and how elements are going to be distributed.* |
 
-#### 2. Subscriber ([Code](https://github.com/reactive-streams/reactive-streams-js/blob/v1.0.2/api/src/main/ts/org/reactivestreams/Subscriber.ts))
+#### 2. Subscriber ([Code](https://github.com/reactive-streams/reactive-streams-js/blob/master/api/src/main/ts/org/reactivestreams/Subscriber.ts))
 
 ```typescript
 interface Subscriber<T> {
@@ -157,7 +157,7 @@ interface Subscriber<T> {
 | <a name="2.13">13</a>     | Calling `onSubscribe`, `onNext`, `onError` or `onComplete` MUST [return normally](#term_return_normally) except when any provided parameter is `null` in which case it MUST throw a `TypeError` to the caller, for all other situations the only legal way for a `Subscriber` to signal failure is by cancelling its `Subscription`. In the case that this rule is violated, any associated `Subscription` to the `Subscriber` MUST be considered as cancelled, and the caller MUST raise this error condition in a fashion that is adequate for the runtime environment. |
 | [:bulb:](#2.13 "2.13 explained") | *The intent of this rule is to establish the semantics for the methods of Subscriber and what the Publisher is allowed to do in which case this rule is violated. «Raise this error condition in a fashion that is adequate for the runtime environment» could mean logging the error—or otherwise make someone or something aware of the situation—as the error cannot be signalled to the faulty Subscriber.* |
 
-#### 3. Subscription ([Code](https://github.com/reactive-streams/reactive-streams-js/blob/v1.0.2/api/src/main/ts/org/reactivestreams/Subscription.ts))
+#### 3. Subscription ([Code](https://github.com/reactive-streams/reactive-streams-js/blob/master/api/src/main/ts/org/reactivestreams/Subscription.ts))
 
 ```typescript
 interface Subscription {
@@ -205,7 +205,7 @@ interface Subscription {
 
 A `Subscription` is shared by exactly one `Publisher` and one `Subscriber` for the purpose of mediating the data exchange between this pair. This is the reason why the `subscribe()` method does not return the created `Subscription`, but instead returns `void`; the `Subscription` is only passed to the `Subscriber` via the `onSubscribe` callback.
 
-#### 4.Processor ([Code](https://github.com/reactive-streams/reactive-streams-js/blob/v1.0.2/api/src/main/ts/org/reactivestreams/Processor.ts))
+#### 4.Processor ([Code](https://github.com/reactive-streams/reactive-streams-js/blob/master/api/src/main/ts/org/reactivestreams/Processor.ts))
 
 ```typescript
 interface Processor<T, R> extends Subscriber<T>, Publisher<R> {
