@@ -25,6 +25,6 @@
   },
   "homepage": "https://github.com/reactive-streams/reactive-streams-js#readme",
   "devDependencies": {
-    "lerna": "^3.10.7"
+    "lerna": "^3.14.1"
   }
 }
