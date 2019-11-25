@@ -5,16 +5,135 @@ interface Sink<T> {
   (resolve: (value?: T | PromiseLike<T>) => void, reject: (reason?: any) => void): void;
   resolve(value?: T | PromiseLike<T>): void
   reject(reason?: any): void
+
+  isFulfilled(): boolean;
+}
+
+interface CancelablePromise<T> extends Promise<T> {
+  cancel(): void;
 }
 
 namespace Sink {
   export const create = <T>() => {
     const sink = <Sink<T>>function (resolve: (value?: T | PromiseLike<T>) => void, reject: (reason?: any) => void): void {
-      sink.resolve = resolve
-      sink.reject = reject;
+      let isFulfilled = false;
+      sink.resolve = (value?: T | PromiseLike<T>) => {
+        isFulfilled = true;
+        resolve(value)
+      };
+      sink.reject = (reason?: any) => {
+        isFulfilled = true;
+        reject(reason);
+      };
+      sink.isFulfilled = () => isFulfilled;
     }
 
     return sink;
+  }
+}
+
+const neverResolvePromise = new Promise((__, ____) => { });
+
+const cancelablePromiseFactory = () => {
+  let isCanceled = false;
+  return class CancelablePromiseImpl<T> extends Promise<T> implements CancelablePromise<T> {
+    private _cancel?: () => void;
+
+    constructor(executor: (resolve: (value?: T | PromiseLike<T>) => void, reject: (reason?: any) => void) => void, cancel?: () => void) {
+      super((resolve, reject) => {
+        executor(
+          (value?: T | PromiseLike<T>) => {
+            if (isCanceled) {
+              return;
+            }
+
+            if (value instanceof Promise) {
+              resolve(value.then(
+                e => {
+                  if (isCanceled) {
+                    return neverResolvePromise;
+                  }
+
+                  return e;
+                },
+                r => {
+                  if (isCanceled) {
+                    return neverResolvePromise;
+                  }
+
+                  return Promise.reject(r)
+                }
+              ));
+            } else {
+              resolve(value);
+            }
+          },
+          (reason?: any) => {
+            if (isCanceled) {
+              return;
+            }
+
+            reject(reason);
+          }
+        );
+      });
+      this._cancel = cancel;
+    }
+
+    public cancel() {
+      isCanceled = true;
+      this._cancel?.();
+    }
+  }
+}
+
+export class AsyncQueue<T> {
+  private readonly store: T[] = [];
+  private promise?: CancelablePromise<T>;
+  private sink?: Sink<T>;
+
+  isEmpty(): boolean {
+    return this.store.length > 0;
+  }
+
+  poll(): CancelablePromise<T> {
+    if (this.store.length > 0) {
+      return new (cancelablePromiseFactory())(r => r(this.store.shift() as T));
+    }
+
+    return this.createPromise();
+  }
+
+  push(value: T | undefined): void {
+    const promise = this.promise;
+    const sink = this.sink;
+
+    this.sink = undefined;
+    this.promise = undefined;
+
+    if (promise) {
+      sink!.resolve(value);
+      return;
+    }
+
+    this.store.push(value as T);
+  }
+
+  private createPromise() {
+    if (this.promise) {
+      throw new Error("Only as single promise allowed");
+    }
+
+    this.sink = Sink.create();
+    this.promise = new (cancelablePromiseFactory())(
+      this.sink,
+      () => {
+        this.sink = undefined;
+        this.promise = undefined;
+      }
+    );
+
+    return this.promise;
   }
 }
 
@@ -22,60 +141,292 @@ namespace Sink {
 function timeoutPromise<T>(errorMessage: string, timeout: number) {
   return new Promise<T>((_, reject) => {
     setTimeout(() => {
-      reject(new Error("Timeout"));
+      reject(new Error(errorMessage + " within " + timeout + " ms but timed out"));
     }, timeout);
   })
 }
 
-export class TestSubscriber<T> implements Subscriber<T> {
-  protected subscription!: Promise<Subscription>;
-  protected sink: Sink<Subscription>;
 
+interface Event<T> {
+  readonly value?: T;
+}
+
+class CompletionEvent implements Event<void> {
   constructor() {
-    this.sink = Sink.create();
-    this.subscription = new Promise(this.sink);
   }
-  onSubscribe(subscription: Subscription): void {
-    console.error(`Unexpected Subscriber::onSubscribe${subscription}`);
-    fail();
+}
+
+class ErrorEvent implements Event<Error> {
+  constructor(private readonly error: Error) {
   }
-  onError(cause: Error): void {
-    console.error(`Unexpected Subscriber::onError(${cause})`);
-    fail(cause);
+
+  get value(): Error {
+    return this.error;
   }
-  onComplete(): void {
-    console.error("Unexpected Subscriber::onComplete()");
-    fail();
+}
+
+class ValueEvent<T> implements Event<T> {
+  constructor(private readonly element: T) {
   }
-  onNext(element: T): void {
-    console.error(`Unexpected Subscriber::onNext(${element})`);
-    fail();
-  }
-  cancel() {
-    if (this.subscription) {
-      this.subscription.then(s => s.cancel(), e => fail(e));
-    }
-    else {
-      console.error("Cannot cancel a subscription before having received it");
-      fail();
-    }
+
+  get value(): T {
+    return this.element;
   }
 }
 
 
+export class Receptacle<T> extends AsyncQueue<CompletionEvent | ErrorEvent | ValueEvent<T>> {
+  private done: boolean = false;
+
+  constructor() {
+    super();
+  }
+
+  next(element: T) {
+    if (this.done) {
+      this.push(new ErrorEvent(new Error(`Emitted unexpected next [${element}] after Terminal signal`)));
+      return;
+    }
+
+    this.push(new ValueEvent(element));
+  }
+
+  error(error: Error) {
+    if (this.done) {
+      this.push(new ErrorEvent(new Error(`Emitted unexpected error [${error}] after Terminal signal`)));
+      return;
+    }
+
+    this.push(new ErrorEvent(error));
+  }
+
+  terminate(): void {
+    if (this.done) {
+      this.push(new ErrorEvent(new Error("Emitted termination more than once")));
+      return;
+    }
+
+    this.done = true;
+
+    this.push(new CompletionEvent());
+  }
+
+  async expectNext(): Promise<T>
+  async expectNext(errorMessage: string): Promise<T>
+  async expectNext(errorMessage: string, timeout: number): Promise<T>
+  async expectNext(errorMessage: string = "Expected next element", timeout: number = 1000): Promise<T> {
+    return Promise.race([
+      this.poll().then(async t => {
+        if (t instanceof CompletionEvent) {
+          return this.undesiredCompletion<T>(errorMessage);
+        } else if (t instanceof ErrorEvent) {
+          return this.undesiredError<T>(errorMessage, t.value);
+        }
+
+        return t.value;
+      }),
+      timeoutPromise<T>(errorMessage, timeout)
+    ]);
+  }
+
+  async expectNextN(n: number): Promise<T[]>
+  async expectNextN(n: number, errorMessage: string): Promise<T[]>
+  async expectNextN(n: number, errorMessage: string, timeout: number): Promise<T[]>
+  async expectNextN(n: number, errorMessage: string = `Expected next ${n} elements`, timeout: number = 1000): Promise<T[]> {
+    return Promise.race<T[]>([
+      this.expectNext(errorMessage).then(async t => {
+        const toCarrieOut: T[] = [];
+
+        toCarrieOut.push(t);
+
+        for (let i = 0; i < (n - 1); i++) {
+          const next = await this.expectNext(errorMessage);
+
+          toCarrieOut.push(next);
+        }
+
+        return toCarrieOut;
+      }),
+      timeoutPromise<T[]>(errorMessage, timeout)
+    ]);
+  }
+
+  async expectComplete(): Promise<void>
+  async expectComplete(errorMessage: string): Promise<void>
+  async expectComplete(errorMessage: string, timeout: number): Promise<void>
+  async expectComplete(errorMessage: string = `Expected completion`, timeout: number = 1000): Promise<void> {
+    return Promise.race<void>([
+      this.poll().then(async t => {
+        if (t instanceof CompletionEvent) {
+          return Promise.resolve();
+        } else if (t instanceof ErrorEvent) {
+          return this.undesiredError<void>(errorMessage, t.value);
+        }
+
+        return this.undesiredNext<void>(errorMessage, t.value);
+      }),
+      timeoutPromise<void>(errorMessage, timeout)
+    ]);
+  }
+
+  async expectError<E extends Error>(errorType: { new(...args: any[]): E }): Promise<E>
+  async expectError<E extends Error>(errorType: { new(...args: any[]): E }, errorMessage: string): Promise<E>
+  async expectError<E extends Error>(errorType: { new(...args: any[]): E }, errorMessage: string, timeout: number): Promise<E>
+  async expectError<E extends Error>(errorType: { new(...args: any[]): E }, errorMessage: string = `Expected error of type [${errorType}]`, timeout: number = 1000): Promise<E> {
+    return Promise.race<E>([
+      this.poll().then(async t => {
+        if (t instanceof CompletionEvent) {
+          return this.undesiredCompletion<E>(errorMessage);
+        } else if (t instanceof ErrorEvent) {
+          if (t.value instanceof errorType) {
+            return t.value;
+          }
+  
+          return this.undesiredError<E>(errorMessage, t.value);
+        }
+
+        return this.undesiredNext<E>(errorMessage, t.value);
+      }),
+      timeoutPromise<E>(errorMessage, timeout)
+    ])
+  }
+
+  async expectNextOrComplete(): Promise<T | void>
+  async expectNextOrComplete(errorMessage: string): Promise<T | void>
+  async expectNextOrComplete(errorMessage: string, timeout: number): Promise<T | void>
+  async expectNextOrComplete(errorMessage: string = `Expected next or completion`, timeout: number = 1000): Promise<T | void> {
+    return Promise.race([
+      this.poll().then(async t => {
+        if (t instanceof CompletionEvent) {
+          return Promise.resolve();
+        } else if (t instanceof ErrorEvent) {
+          return this.undesiredError<void>(errorMessage, t.value);
+        }
+
+        return t.value;
+      }),
+      timeoutPromise<T | void>(errorMessage, timeout)
+    ])
+  }
+
+  async expectNone(): Promise<void>
+  async expectNone(errorMessage: string): Promise<void>
+  async expectNone(errorMessage: string, timeout: number): Promise<void>
+  async expectNone(errorMessage: string = "Expected none", timeout: number = 1000): Promise<void> {
+    const valuePromise = this.poll();
+    return Promise.race([
+      valuePromise.then(t => {
+        if (t instanceof CompletionEvent) {
+          return this.undesiredCompletion<void>(errorMessage);
+        } else if (t instanceof ErrorEvent) {
+          return this.undesiredError<void>(errorMessage, t.value);
+        }
+
+        return this.undesiredNext<void>(errorMessage, t.value);
+      }),
+      timeoutPromise<void>(errorMessage, timeout).then(_ => { }, _ => {
+        valuePromise.cancel();
+
+        return Promise.resolve();
+      })
+    ])
+  }
+
+  private async undesiredNext<LT>(errorMessage: string, t: T): Promise<LT> {
+    return Promise.reject(new Error(`${errorMessage} but got next [${t}]`));
+  }
+
+  private async undesiredError<LT>(errorMessage: string, e: Error): Promise<LT> {
+    return Promise.reject(new Error(`${errorMessage} but got error [${e}]`));
+  }
+
+  private async undesiredCompletion<LT>(errorMessage: string): Promise<LT> {
+    return Promise.reject(new Error(`${errorMessage} but got completion`));
+  }
+}
+
+
+export class TestSubscriber<T> implements Subscriber<T> {
+  private readonly subscription: Promise<Subscription>;
+  private readonly sink: Sink<Subscription>;
+  protected readonly received: Receptacle<T>;
+
+  constructor() {
+    this.received = new Receptacle<T>();
+    this.sink = Sink.create();
+    this.subscription = new Promise(this.sink);
+  }
+
+  onSubscribe(subscription: Subscription): void {
+    if (this.sink.isFulfilled()) {
+      this.received.error(new Error(`Unexpected Subscriber::onSubscribe${subscription}`));
+    }
+
+    this.sink.resolve(subscription);
+  }
+
+  onError(cause: Error): void {
+    this.received.error(new Error(`Unexpected Subscriber::onError(${cause})`));
+  }
+
+  onComplete(): void {
+    this.received.error(new Error("Unexpected Subscriber::onComplete()"));
+  }
+
+  onNext(element: T): void {
+    this.received.error(new Error(`Unexpected Subscriber::onNext(${element})`));
+  }
+
+  cancel() {
+    this.expectSubscription().then(s => s.cancel(), e => this.received.error(new Error(`Expected Subscription but got [${e}]`)));
+  }
+
+  async expectSubscription(): Promise<Subscription>;
+  async expectSubscription(timeout: number): Promise<Subscription>;
+  async expectSubscription(timeout: number, errorMsg: string): Promise<Subscription>;
+  async expectSubscription(timeout: number = 1000, errorMsg: string = "Expected subscription"): Promise<Subscription> {
+    return Promise.race([
+      timeoutPromise<Subscription>(errorMsg, timeout),
+      this.subscription.then(s => {
+        if (s) {
+          let missing: string[] = [];
+
+          if (!s.request) {
+            missing.push("request");
+          }
+          if (!s.cancel) {
+            missing.push("cancel");
+          }
+
+          if (missing.length != 0) {
+            return Promise.reject<Subscription>(new Error(`Expected subscription but got ${s} with missing fields [${missing}]`));
+          }
+
+          return s;
+        }
+
+        return Promise.reject<Subscription>(new Error(`Expected subscription but got nothing`));
+      })
+    ]);
+  }
+}
 
 export class ManualSubscriber<T> extends TestSubscriber<T> {
 
-  private readonly received: Receptacle<T>;
   private requested: bigInt.BigInteger;
 
   constructor() {
     super();
-    this.received = new Receptacle<T>();
     this.requested = bigInt();
   }
 
   onNext(element: T): void {
+    if (this.requested.eq(0)) {
+      fail("Received more than onNext signals than expected!");
+    }
+
+    this.requested = this.requested.prev();
+
     this.received.next(element);
   }
 
@@ -84,433 +435,107 @@ export class ManualSubscriber<T> extends TestSubscriber<T> {
   }
 
   async request(elements: number): Promise<void> {
-    const s = await this.subscription;
+    const s: Subscription = await this.expectSubscription();
+    this.requested = this.requested.add(elements);
     s.request(elements);
   }
 
-  async requestNextElement(): Promise<T>
-  async requestNextElement(): Promise<T> {
+  async requestNextElement(): Promise<T>;
+  async requestNextElement(timeout: number): Promise<T>;
+  async requestNextElement(timeout: number, errorMessage: string): Promise<T>;
+  async requestNextElement(timeout: number = 1000, errorMessage: string = "Expected next element"): Promise<T> {
     await this.request(1);
-    return this.received.expectNext("");
+    return this.nextElement(timeout, errorMessage);
   }
 
-  // public Optional<T> requestNextElementOrEndOfStream() throws InterruptedException {
-  //   return requestNextElementOrEndOfStream(env.defaultTimeoutMillis(), "Did not receive expected stream completion");
-  // }
-
-  // public Optional<T> requestNextElementOrEndOfStream(String errorMsg) throws InterruptedException {
-  //   return requestNextElementOrEndOfStream(env.defaultTimeoutMillis(), errorMsg);
-  // }
-
-  // public Optional<T> requestNextElementOrEndOfStream(long timeoutMillis) throws InterruptedException {
-  //   return requestNextElementOrEndOfStream(timeoutMillis, "Did not receive expected stream completion");
-  // }
-
-  // public Optional<T> requestNextElementOrEndOfStream(long timeoutMillis, String errorMsg) throws InterruptedException {
-  //   request(1);
-  //   return nextElementOrEndOfStream(timeoutMillis, errorMsg);
-  // }
-
-  // public void requestEndOfStream() throws InterruptedException {
-  //   requestEndOfStream(env.defaultTimeoutMillis(), "Did not receive expected stream completion");
-  // }
-
-  // public void requestEndOfStream(long timeoutMillis) throws InterruptedException {
-  //   requestEndOfStream(timeoutMillis, "Did not receive expected stream completion");
-  // }
-
-  // public void requestEndOfStream(String errorMsg) throws InterruptedException {
-  //   requestEndOfStream(env.defaultTimeoutMillis(), errorMsg);
-  // }
-
-  // public void requestEndOfStream(long timeoutMillis, String errorMsg) throws InterruptedException {
-  //   request(1);
-  //   expectCompletion(timeoutMillis, errorMsg);
-  // }
-
-  // public List<T> requestNextElements(long elements) throws InterruptedException {
-  //   request(elements);
-  //   return nextElements(elements, env.defaultTimeoutMillis());
-  // }
-
-  // public List<T> requestNextElements(long elements, long timeoutMillis) throws InterruptedException {
-  //   request(elements);
-  //   return nextElements(elements, timeoutMillis, String.format("Did not receive %d expected elements", elements));
-  // }
-
-  // public List<T> requestNextElements(long elements, long timeoutMillis, String errorMsg) throws InterruptedException {
-  //   request(elements);
-  //   return nextElements(elements, timeoutMillis, errorMsg);
-  // }
-
-  // public T nextElement() throws InterruptedException {
-  //   return nextElement(env.defaultTimeoutMillis());
-  // }
-
-  // public T nextElement(long timeoutMillis) throws InterruptedException {
-  //   return nextElement(timeoutMillis, "Did not receive expected element");
-  // }
-
-  // public T nextElement(String errorMsg) throws InterruptedException {
-  //   return nextElement(env.defaultTimeoutMillis(), errorMsg);
-  // }
-
-  // public T nextElement(long timeoutMillis, String errorMsg) throws InterruptedException {
-  //   return received.next(timeoutMillis, errorMsg);
-  // }
-
-  // public Optional<T> nextElementOrEndOfStream() throws InterruptedException {
-  //   return nextElementOrEndOfStream(env.defaultTimeoutMillis(), "Did not receive expected stream completion");
-  // }
-
-  // public Optional<T> nextElementOrEndOfStream(long timeoutMillis) throws InterruptedException {
-  //   return nextElementOrEndOfStream(timeoutMillis, "Did not receive expected stream completion");
-  // }
-
-  // public Optional<T> nextElementOrEndOfStream(long timeoutMillis, String errorMsg) throws InterruptedException {
-  //   return received.nextOrEndOfStream(timeoutMillis, errorMsg);
-  // }
-
-  // public List<T> nextElements(long elements) throws InterruptedException {
-  //   return nextElements(elements, env.defaultTimeoutMillis(), "Did not receive expected element or completion");
-  // }
-
-  // public List<T> nextElements(long elements, String errorMsg) throws InterruptedException {
-  //   return nextElements(elements, env.defaultTimeoutMillis(), errorMsg);
-  // }
-
-  // public List<T> nextElements(long elements, long timeoutMillis) throws InterruptedException {
-  //   return nextElements(elements, timeoutMillis, "Did not receive expected element or completion");
-  // }
-
-  // public List<T> nextElements(long elements, long timeoutMillis, String errorMsg) throws InterruptedException {
-  //   return received.nextN(elements, timeoutMillis, errorMsg);
-  // }
-
-  // public void expectNext(T expected) throws InterruptedException {
-  //   expectNext(expected, env.defaultTimeoutMillis());
-  // }
-
-  // public void expectNext(T expected, long timeoutMillis) throws InterruptedException {
-  //   T received = nextElement(timeoutMillis, "Did not receive expected element on downstream");
-  //   if (!received.equals(expected)) {
-  //     env.flop(String.format("Expected element %s on downstream but received %s", expected, received));
-  //   }
-  // }
-
-  // public void expectCompletion() throws InterruptedException {
-  //   expectCompletion(env.defaultTimeoutMillis(), "Did not receive expected stream completion");
-  // }
-
-  // public void expectCompletion(long timeoutMillis) throws InterruptedException {
-  //   expectCompletion(timeoutMillis, "Did not receive expected stream completion");
-  // }
-
-  // public void expectCompletion(String errorMsg) throws InterruptedException {
-  //   expectCompletion(env.defaultTimeoutMillis(), errorMsg);
-  // }
-
-  // public void expectCompletion(long timeoutMillis, String errorMsg) throws InterruptedException {
-  //   received.expectCompletion(timeoutMillis, errorMsg);
-  // }
-
-  // public <E extends Throwable> void expectErrorWithMessage(Class<E> expected, String requiredMessagePart) throws Exception {
-  //   expectErrorWithMessage(expected, Collections.singletonList(requiredMessagePart), env.defaultTimeoutMillis(), env.defaultPollTimeoutMillis());
-  // }
-  // public <E extends Throwable> void expectErrorWithMessage(Class<E> expected, List<String> requiredMessagePartAlternatives) throws Exception {
-  //   expectErrorWithMessage(expected, requiredMessagePartAlternatives, env.defaultTimeoutMillis(), env.defaultPollTimeoutMillis());
-  // }
-
-  // @SuppressWarnings("ThrowableResultOfMethodCallIgnored")
-  // public <E extends Throwable> void expectErrorWithMessage(Class<E> expected, String requiredMessagePart, long timeoutMillis) throws Exception {
-  //   expectErrorWithMessage(expected, Collections.singletonList(requiredMessagePart), timeoutMillis);
-  // }
-
-  // public <E extends Throwable> void expectErrorWithMessage(Class<E> expected, List<String> requiredMessagePartAlternatives, long timeoutMillis) throws Exception {
-  //   expectErrorWithMessage(expected, requiredMessagePartAlternatives, timeoutMillis, timeoutMillis);
-  // }
-
-  // public <E extends Throwable> void expectErrorWithMessage(Class<E> expected, List<String> requiredMessagePartAlternatives,
-  //                                                          long totalTimeoutMillis, long pollTimeoutMillis) throws Exception {
-  //   final E err = expectError(expected, totalTimeoutMillis, pollTimeoutMillis);
-  //   final String message = err.getMessage();
-
-  //   boolean contains = false;
-  //   for (String requiredMessagePart : requiredMessagePartAlternatives)
-  //     if (message.contains(requiredMessagePart)) contains = true; // not short-circuting loop, it is expected to
-  //   assertTrue(contains,
-  //           String.format("Got expected exception [%s] but missing message part [%s], was: %s",
-  //                   err.getClass(), "anyOf: " + requiredMessagePartAlternatives, err.getMessage()));
-  // }
-
-  // public <E extends Throwable> E expectError(Class<E> expected) throws Exception {
-  //   return expectError(expected, env.defaultTimeoutMillis());
-  // }
-
-  // public <E extends Throwable> E expectError(Class<E> expected, long timeoutMillis) throws Exception {
-  //   return expectError(expected, timeoutMillis, env.defaultPollTimeoutMillis());
-  // }
-
-  // public <E extends Throwable> E expectError(Class<E> expected, String errorMsg) throws Exception {
-  //   return expectError(expected, env.defaultTimeoutMillis(), errorMsg);
-  // }
-
-  // public <E extends Throwable> E expectError(Class<E> expected, long timeoutMillis, String errorMsg) throws Exception {
-  //   return expectError(expected, timeoutMillis, env.defaultPollTimeoutMillis(), errorMsg);
-  // }
-
-  // public <E extends Throwable> E expectError(Class<E> expected, long totalTimeoutMillis, long pollTimeoutMillis) throws Exception {
-  //   return expectError(expected, totalTimeoutMillis, pollTimeoutMillis, String.format("Expected onError(%s)", expected.getName()));
-  // }
-
-  // public <E extends Throwable> E expectError(Class<E> expected, long totalTimeoutMillis, long pollTimeoutMillis,
-  //                                            String errorMsg) throws Exception {
-  //   return received.expectError(expected, totalTimeoutMillis, pollTimeoutMillis, errorMsg);
-  // }
-
-  // public void expectNone() throws InterruptedException {
-  //   expectNone(env.defaultNoSignalsTimeoutMillis());
-  // }
-
-  // public void expectNone(String errMsgPrefix) throws InterruptedException {
-  //   expectNone(env.defaultNoSignalsTimeoutMillis(), errMsgPrefix);
-  // }
-
-  // public void expectNone(long withinMillis) throws InterruptedException {
-  //   expectNone(withinMillis, "Did not expect an element but got element");
-  // }
-
-  // public void expectNone(long withinMillis, String errMsgPrefix) throws InterruptedException {
-  //   received.expectNone(withinMillis, errMsgPrefix);
-  // }
-
-}
-
-export class Receptacle<T> {
-  private sink: Sink<T | Array<T> | Error>;
-  private task: Promise<T | Array<T> | Error | void>;
-  private actions: T[] = [];
-  private expects: number = 0;
-  private done: boolean = false;
-  private error?: Error;
-
-  constructor() {
-    this.sink = Sink.create();
-    this.task = new Promise(this.sink);
+  async requestNextElementOrCompletion(): Promise<T | void>;
+  async requestNextElementOrCompletion(timeout: number): Promise<T | void>;
+  async requestNextElementOrCompletion(timeout: number, errorMsg: string): Promise<T | void>;
+  async requestNextElementOrCompletion(timeout: number = 1000, errorMsg: string = "Expected next element or completion"): Promise<T | void> {
+    await this.request(1);
+    return this.nextElementOrCompletion(timeout, errorMsg);
   }
 
-  next(element: T) {
-    if (this.done) {
-      fail("Emitted unexpected next after Terminal signal")
-    }
-    const actions = this.actions;
-    const sink = this.sink;
-    if (this.expects < 0) {
-      sink.reject(new Error("Received unexpected onNext call [" + element + "]"));
-    }
-    else if (this.expects === 0) {
-      actions.push(element);
-    }
-    else if (this.expects === 1) {
-      this.sink = Sink.create();
-      this.task = new Promise(this.sink);
-      sink.resolve(element);
-    }
-    else if (actions.length < this.expects) {
-      actions.push(element);
-      if (actions.length == this.expects) {
-        this.actions = [];
-        this.expects = 0;
-        this.sink = Sink.create();
-        this.task = new Promise(this.sink);
-        sink.resolve(actions);
-      }
+  async requestCompletion(): Promise<void>;
+  async requestCompletion(timeout: number): Promise<void>;
+  async requestCompletion(timeout: number, errorMsg: string): Promise<void>;
+  async requestCompletion(timeout: number = 1000, errorMsg: string = "Expected completion"): Promise<void> {
+    await this.request(1);
+    return this.expectCompletion(timeout, errorMsg);
+  }
+
+  async requestNextElements(elements: number): Promise<T[]>;
+  async requestNextElements(elements: number, timeout: number): Promise<T[]>;
+  async requestNextElements(elements: number, timeout: number, errorMsg: string): Promise<T[]>;
+  async requestNextElements(elements: number, timeout: number = 1000, errorMsg: string = `Expected next [${elements}] element`): Promise<T[]> {
+    await this.request(elements);
+    return this.nextElements(elements, timeout, errorMsg);
+  }
+
+  async nextElement(): Promise<T>;
+  async nextElement(timeout: number): Promise<T>;
+  async nextElement(timeout: number, errorMsg: string): Promise<T>;
+  async nextElement(timeout: number = 1000, errorMsg: string = "Expected next element"): Promise<T> {
+    return this.received.expectNext(errorMsg, timeout);
+  }
+
+  async nextElementOrCompletion(): Promise<T | void>;
+  async nextElementOrCompletion(timeout: number): Promise<T | void>;
+  async nextElementOrCompletion(timeout: number, errorMsg: string): Promise<T | void>;
+  async nextElementOrCompletion(timeout: number = 1000, errorMsg: string = "Expected next element or completion"): Promise<T | void> {
+    return this.received.expectNextOrComplete(errorMsg, timeout);
+  }
+
+  async nextElements(elements: number): Promise<T[]>;
+  async nextElements(elements: number, timeout: number): Promise<T[]>;
+  async nextElements(elements: number, timeout: number, errorMsg: string): Promise<T[]>;
+  async nextElements(elements: number, timeout: number = 1000, errorMsg: string = `Expected next [${elements}] element`): Promise<T[]> {
+    return this.received.expectNextN(elements, errorMsg, timeout);
+  }
+
+  async expectNext(expected: T): Promise<void>;
+  async expectNext(expected: T, timeout: number): Promise<void>;
+  async expectNext(expected: T, timeout: number = 1000): Promise<void> {
+    const received: T = await this.nextElement(timeout, "Expected next element");
+    if (received !== expected) {
+      return Promise.reject(new Error(`Expected element [${expected}] on downstream but received [${received}]`));
     }
   }
 
-  terminate(): void
-  terminate(error: Error): void
-  terminate(error?: Error): void {
-    if (this.done) {
-      fail("Emitted Terminal signal twice")
-    }
+  async expectCompletion(): Promise<void>;
+  async expectCompletion(timeout: number): Promise<void>;
+  async expectCompletion(timeout: number, errorMsg: string): Promise<void>;
+  async expectCompletion(timeout: number = 1000, errorMsg: string = "Did not receive expected stream completion"): Promise<void> {
+    this.received.expectComplete(errorMsg, timeout);
+  }
 
-    this.done = true;
-    this.error = error;
+  async expectErrorWithMessage<E extends Error>(expected: (new () => E), requiredMessagePart: string): Promise<void>
+  async expectErrorWithMessage<E extends Error>(expected: (new () => E), requiredMessagePartAlternatives: string[]): Promise<void>;
+  async expectErrorWithMessage<E extends Error>(expected: (new () => E), requiredMessagePartAlternatives: string[], timeout: number): Promise<void>;
+  async expectErrorWithMessage<E extends Error>(expected: (new () => E), requiredMessagePartAlternatives: string[] | string, timeout: number = 1000): Promise<void> {
+    const err: E = await this.expectError(expected, timeout);
+    const message = err.message;
 
-    if (this.actions.length === 0 || (this.expects !== 0 && this.actions.length !== this.expects)) {
-      this.sink.resolve(this.error);
+    const partsToCheck: string[] = requiredMessagePartAlternatives instanceof Array
+      ? requiredMessagePartAlternatives
+      : [requiredMessagePartAlternatives];
+
+    if (!partsToCheck.some((requiredMessagePart) => message.includes(requiredMessagePart))) {
+      return Promise.reject(new Error("Got expected exception [" + expected.name + "] but missing any of [" + requiredMessagePartAlternatives + "] message parts, was: " + message));
     }
   }
 
-  async expectNext(errorMessage: string): Promise<T>
-  async expectNext(errorMessage: string, timeout: number = 1000): Promise<T> {
-    const actions = this.actions;
-
-    if (actions.length >= 1) {
-      return Promise.resolve(actions.shift() as T);
-    }
-
-    if (this.done) {
-      return Promise.reject(
-        this.error
-          ? new Error("Expected element but got error: " + this.error.message)
-          : new Error("Expected element but got completion")
-      );
-    }
-
-    this.expects = 1;
-    const promise = timeoutPromise<T>(errorMessage, timeout);
-    return Promise.race([
-      this.task.then<T>(e => {
-        if (e instanceof Error) {
-          return Promise.reject(new Error("Expected next element but got error [" + e + "]"));
-        } else if(!e) {
-          return Promise.reject(new Error("Expected next element but got completion"));
-        } else {
-          return e as T; 
-        }
-      }), 
-      promise
-    ]);
+  async expectError<E extends Error>(expected: (new () => E)): Promise<E>;
+  async expectError<E extends Error>(expected: (new () => E), timeout: number): Promise<E>;
+  async expectError<E extends Error>(expected: (new () => E), timeout: number, errorMsg: string): Promise<E>;
+  async expectError<E extends Error>(expected: (new () => E), timeout: number = 1000, errorMsg: string = "Expected onError(" + expected.name + ")"): Promise<E> {
+    return this.received.expectError(expected, errorMsg, timeout);
   }
 
-  async expectNextN(n: number, errorMessage: string): Promise<T[]>
-  async expectNextN(n: number, errorMessage: string, timeout: number = 1000): Promise<T[]> {
-    const actions = this.actions;
-
-    if (actions.length >= n) {
-      return Promise.resolve(actions.splice(0, n));
-    }
-
-    if (this.done) {
-      return Promise.reject(
-        this.error
-          ? new Error("Expected " + n + " elements but got error: [" + this.error + "]")
-          : new Error("Expected " + n + " elements but got completion")
-      );
-    }
-
-    this.expects = n;
-    const promise = timeoutPromise<T[]>(errorMessage, timeout);
-    return Promise.race<T[]>([
-      this.task.then<T[]>(e => {
-        if (e instanceof Array) {
-          return e;
-        } else if (e instanceof Error) {
-          return Promise.reject(new Error("Expected next " + n + " elements but got error [" + e + "]"));
-        } else {
-          return Promise.reject(new Error("Expected next " + n + " elements but got completion"));
-        }
-      }),
-      promise
-    ]);
-  }
-
-  async expectComplete(errorMessage: string): Promise<void>
-  async expectComplete(errorMessage: string, timeout: number = 1000): Promise<void> {
-    if (this.done) {
-      if (this.actions.length == 0) {
-        if (this.error) {
-          return Promise.reject(new Error("Expected completion but got error [" + this.error + "]"))
-        } else {
-          return Promise.resolve();
-        }
-      } else {
-        return Promise.reject(new Error("Expected the end of the stream but got elements [" + this.actions + "]"))
-      }
-    } else if (this.actions.length > 0) {
-      return Promise.reject(new Error("Expected the end of the stream but got elements [" + this.actions + "]"))
-    }
-
-    this.expects = -1;
-    const promise = timeoutPromise<void>(errorMessage, timeout);
-    return Promise.race<void>([
-      this.task.then<void>(e => {
-        if (e instanceof Error) {
-          return Promise.reject<void>(new Error("Expected completion but got error [" + e + "]"));
-        } else {
-          return Promise.resolve();
-        }
-      }), 
-      promise
-    ]);
-  }
-
-  async expectError<TView extends Error>(errorType: { new (...args: any[]): TView }, errorMessage:string): Promise<Error>
-  async expectError<TView extends Error>(errorType: { new (...args: any[]): TView }, errorMessage:string, timeout: number = 1000): Promise<Error> { 
-    if (this.done) {
-      if (this.actions.length == 0) {
-        if (!this.error) {
-          return Promise.reject(new Error("Expected error but got completion"))
-        } else {
-          return Promise.resolve(this.error);
-        }
-      } else {
-        return Promise.reject(new Error("Expected the end of the stream but got elements [" + this.actions + "]"))
-      }
-    } else if (this.actions.length > 0) {
-      return Promise.reject(new Error("Expected the end of the stream but got elements [" + this.actions + "]"))
-    }
-
-    this.expects = -1;
-    const promise = timeoutPromise<Error>(errorMessage, timeout);
-    return Promise.race<Error>([
-      this.task.then<Error>(e => {
-        if (e instanceof Error) {
-          if (e instanceof errorType) {
-            return e;
-          } else {
-            return Promise.reject(new Error("Expected error of type [" + errorType + "] but got [" + e + "] instead"));
-          }
-        } else if (!e) {
-          return Promise.reject(new Error("Expected error but got completion"))
-        } else {
-          return Promise.reject(new Error("Expected terminal signal but got next [" + e + "] instead"))
-        }
-      }),
-      promise
-    ])
-  }
-  async expectNextOrEndOfStream(errorMessage: string): Promise<T | Error | void>
-  async expectNextOrEndOfStream(errorMessage: string, timeout: number = 1000): Promise<T | Error | void> {
-    if (this.actions.length >= 1) {
-      return Promise.resolve(this.actions.shift() as T);
-    }
-    if (this.done) {
-      return Promise.resolve(this.error);
-    }
-
-    this.expects = 1;
-    const promise = timeoutPromise<T | Error | void>(errorMessage, timeout);
-    return Promise.race([(this.task as any), promise])
-  }
-
-  async expectNone(errorMessage: string): Promise<T | Error | void>
-  async expectNone(errorMessage: string, timeout: number = 1000): Promise<T | Error | void> {
-    if (this.actions.length >= 1) {
-      return Promise.resolve(this.actions.shift() as T);
-    }
-    
-    if (this.done && this.expects !== -1) {
-      return this.error 
-        ? Promise.reject(new Error("Expected none but got error [" + this.error + "]"))
-        : Promise.reject(new Error("Expected none but got completion"));
-    }
-
-    this.expects = -1;
-    const promise = timeoutPromise<T | Error | void>(errorMessage, timeout);
-    return Promise.race([
-      this.task.then(e => {
-        if (e instanceof Error) {
-          return Promise.reject(new Error("Expected none but got error [" + e + "]"));
-        } else if (e) {
-          return Promise.reject(new Error("Expected none but got next [" + e + "]"));
-        } else {
-          return Promise.reject(new Error("Expected none but got completion"));
-        }
-      }),
-      promise.catch(() => Promise.resolve())
-    ])
+  async expectNone(): Promise<void>;
+  async expectNone(timeout: number): Promise<void>;
+  async expectNone(timeout: number, errMsgPrefix: string): Promise<void>;
+  async expectNone(timeout: number = 1000, errMsgPrefix: string = "Did not expect an element but got element"): Promise<void> {
+    return this.received.expectNone(errMsgPrefix, timeout);
   }
 }

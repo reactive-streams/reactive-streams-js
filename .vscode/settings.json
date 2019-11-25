@@ -1,5 +1,5 @@
 {
-    "javascript.validate.enable": false,
-    "flowide.pathToFlow": "/Users/olehdokuka/Documents/Workspace/Java/reactive-streams-js/api/node_modules/.bin/flow",
-    "flow.pathToFlow": "/Users/olehdokuka/Documents/Workspace/Java/reactive-streams-js/api/node_modules/.bin/flow"
+    "jest.pathToJest": "./tck/node_modules/.bin/jest",
+    "jest.pathToConfig": "./tck/jest.config.js",
+    "jest.showCoverageOnLoad": true
 }

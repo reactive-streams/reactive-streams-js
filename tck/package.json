@@ -22,13 +22,13 @@
   },
   "homepage": "https://github.com/reactive-streams/reactive-streams-js#readme",
   "dependencies": {
-    "@types/jest": "^24.0.15",
+    "@types/jest": "^24.0.23",
     "reactive-streams": "^1.0.2",
-    "big-integer": "^1.6.44",
-    "jest": "^24.8.0",
-    "typescript": "^3.5.2"
+    "big-integer": "^1.6.48",
+    "jest": "^24.9.0",
+    "typescript": "^3.7.2"
   },
   "devDependencies": {
-    "ts-jest": "^24.0.2"
+    "ts-jest": "^24.2.0"
   }
 }

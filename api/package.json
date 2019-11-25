@@ -30,8 +30,8 @@
   "devDependencies": {
     "babel-cli": "^6.26.0",
     "babel-plugin-transform-flow-strip-types": "^6.22.0",
-    "flow-bin": "^0.101.1",
-    "flow-copy-source": "^2.0.6",
-    "typescript": "^3.5.2"
+    "flow-bin": "^0.112.0",
+    "flow-copy-source": "^2.0.9",
+    "typescript": "^3.7.2"
   }
 }

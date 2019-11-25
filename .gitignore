@@ -81,3 +81,8 @@ typings/
 
 # Exclude lib 
 **/lib/**
+
+# Editors
+.idea
+.vscode
+.DS_Store
