@@ -1,0 +1,13 @@
+{
+  "name": "reactive-streams",
+  "version": "1.0.0",
+  "description": "Reactive Streams API",
+  "repository": "https://github.com/reactive-streams/reactive-streams-js.git",
+  "keywords": [],
+  "author": "Reactive Streams SIG",
+  "license": "CC0",
+  "bugs": {
+    "url": "https://github.com/reactive-streams/reactive-streams-js/issues"
+  },
+  "homepage": "http://reactive-streams.org"
+}
