@@ -1,0 +1,30 @@
+{
+  "name": "reactive-streams",
+  "version": "1.0.2",
+  "description": "Reactive Streams Specification for the JS",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reactive-streams/reactive-streams-js.git"
+  },
+  "keywords": [
+    "Reactive",
+    "Reactive-Streams",
+    "Reactive Programming",
+    "Specification"
+  ],
+  "author": "Oleh Dokuka<oleh@netifi.com>",
+  "license": "CC0-1.0",
+  "bugs": {
+    "url": "https://github.com/reactive-streams/reactive-streams-js/issues"
+  },
+  "homepage": "https://github.com/reactive-streams/reactive-streams-js#readme",
+  "devDependencies": {
+    "lerna": "^3.19.0"
+  }
+}

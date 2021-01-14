@@ -1,0 +1,5 @@
+{
+    "jest.pathToJest": "./tck/node_modules/.bin/jest",
+    "jest.pathToConfig": "./tck/jest.config.js",
+    "jest.showCoverageOnLoad": true
+}
